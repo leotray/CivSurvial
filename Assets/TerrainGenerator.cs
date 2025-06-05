@@ -1,7 +1,7 @@
-using System.Collections.Generic;
-using System.Diagnostics;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
+[ExecuteInEditMode]
 [RequireComponent(typeof(MeshFilter), typeof(MeshRenderer))]
 public class TerrainGenerator : MonoBehaviour
 {
@@ -15,16 +15,38 @@ public class TerrainGenerator : MonoBehaviour
     public int octaves = 4;
     public float persistence = 0.5f;
     public float lacunarity = 2f;
+    public Vector2 noiseOffset;
 
     [Header("Biome Settings")]
     public List<Biome> biomes;
-    public Material terrainMaterial; // Material using a texture array shader
-    
+    public Material terrainMaterial;
+
+    [Header("River Settings")]
+    public int riverCount = 2;
+    public float riverWidth = 5f;
+    public float riverDepth = 2f;
+    public float riverCurveFrequency = 0.05f;
+
+    [Header("Spawn Settings")]
+    [Range(0f, 1f)] public float spawnBlendThreshold = 0.1f;
+    [Range(0f, 1f)] public float spawnMinHeight = 0f;
+    public bool ignoreSpawnChance = false;
+    public float spawnCheckInterval = 10f;
+
     private Mesh mesh;
     private Vector3[] vertices;
     private int[] triangles;
     private Color[] colors;
-    public bool regenerate = false; // Toggle in Inspector during Play Mode
+    private Vector3[] normals;
+
+    private List<GameObject> spawnedObjects = new List<GameObject>();
+    public bool regenerate = false;
+
+    void Start()
+    {
+        GenerateTerrain();
+        SpawnBiomeObjects();
+    }
 
     void Update()
     {
@@ -32,13 +54,14 @@ public class TerrainGenerator : MonoBehaviour
         {
             regenerate = false;
             GenerateTerrain();
+            SpawnBiomeObjects();
         }
     }
+
     void GenerateTerrain()
     {
         mesh = new Mesh();
         GetComponent<MeshFilter>().mesh = mesh;
-
         CreateShape();
         UpdateMesh();
     }
@@ -49,26 +72,33 @@ public class TerrainGenerator : MonoBehaviour
         colors = new Color[vertices.Length];
         triangles = new int[width * depth * 6];
 
-        float[,] falloffMap = GenerateFalloffMap(width, depth); // Move outside loop!
+        float[,] falloffMap = GenerateFalloffMap(width, depth);
 
-        for (int z = 0; z <= depth; z++)
+        for (int z = 0, index = 0; z <= depth; z++)
         {
-            for (int x = 0; x <= width; x++)
+            for (int x = 0; x <= width; x++, index++)
             {
-                int index = z * (width + 1) + x;
+                float xCoord = x + noiseOffset.x;
+                float zCoord = z + noiseOffset.y;
 
-                float baseHeight = GenerateFractalNoise(x, z);
+                float baseHeight = GenerateFractalNoise(xCoord, zCoord);
                 float falloff = falloffMap[x, z];
                 float finalHeight = Mathf.Clamp01(baseHeight - falloff) * heightMultiplier;
+
+                float riverCarve = GetRiverOffset(x, z);
+                finalHeight -= riverCarve;
 
                 vertices[index] = new Vector3(x, finalHeight, z);
 
                 float temp = Mathf.InverseLerp(0, width, x);
                 float moisture = Mathf.InverseLerp(0, depth, z);
-                
 
                 (int biomeIndex, float blendWeight) = GetBiomeBlend(temp, moisture);
-                colors[index] = new Color(blendWeight, biomeIndex / (float)(biomes.Count - 1), 0);
+
+                bool isRiver = riverCarve > 0.01f;
+                colors[index] = isRiver ?
+                    new Color(0, 0, 1) :
+                    new Color(blendWeight, biomeIndex / (float)(biomes.Count - 1), 0);
             }
         }
 
@@ -100,6 +130,90 @@ public class TerrainGenerator : MonoBehaviour
         mesh.triangles = triangles;
         mesh.colors = colors;
         mesh.RecalculateNormals();
+        normals = mesh.normals;
+        mesh.RecalculateBounds();
+
+        if (terrainMaterial != null)
+        {
+            GetComponent<MeshRenderer>().material = terrainMaterial;
+        }
+
+        // Add or update MeshCollider
+        MeshCollider collider = GetComponent<MeshCollider>();
+        if (collider == null)
+            collider = gameObject.AddComponent<MeshCollider>();
+
+        collider.sharedMesh = null; // Force update
+        collider.sharedMesh = mesh;
+    }
+
+    void SpawnBiomeObjects()
+    {
+        ClearSpawnedObjects();
+
+        if (biomes == null || biomes.Count == 0) return;
+
+        if (normals == null || normals.Length != vertices.Length)
+        {
+            mesh.RecalculateNormals();
+            normals = mesh.normals;
+        }
+
+        int spawnedCount = 0;
+
+        for (float z = 0; z <= depth; z += spawnCheckInterval)
+        {
+            for (float x = 0; x <= width; x += spawnCheckInterval)
+            {
+                int xIndex = Mathf.RoundToInt(x);
+                int zIndex = Mathf.RoundToInt(z);
+                int index = zIndex * (width + 1) + xIndex;
+
+                if (index >= vertices.Length) continue;
+
+                Color color = colors[index];
+                float blend = color.r;
+                int biomeIndex = Mathf.RoundToInt(color.g * (biomes.Count - 1));
+                float height = vertices[index].y;
+
+                if (biomeIndex < 0 || biomeIndex >= biomes.Count) continue;
+                Biome biome = biomes[biomeIndex];
+
+                if (biome.spawnPrefabs == null || biome.spawnPrefabs.Count == 0)
+                    continue;
+
+                if (blend < spawnBlendThreshold || height < spawnMinHeight)
+                    continue;
+
+                float chance = biome.spawnDensity * blend * blend;
+                bool shouldSpawn = ignoreSpawnChance || (Random.value <= chance);
+
+                if (!shouldSpawn)
+                    continue;
+
+                GameObject prefab = biome.spawnPrefabs[Random.Range(0, biome.spawnPrefabs.Count)];
+                Vector3 position = vertices[index] + transform.position;
+                Vector3 normal = normals != null && index < normals.Length ? normals[index] : Vector3.up;
+
+                Quaternion rotation = Quaternion.FromToRotation(Vector3.up, normal) *
+                                      Quaternion.Euler(0, Random.Range(0, 360f), 0);
+
+                GameObject spawned = Instantiate(prefab, position, rotation, transform);
+                spawnedObjects.Add(spawned);
+                spawnedCount++;
+            }
+        }
+
+        Debug.Log($"Spawned total: {spawnedCount}");
+    }
+
+    void ClearSpawnedObjects()
+    {
+        foreach (var obj in spawnedObjects)
+        {
+            if (obj != null) DestroyImmediate(obj);
+        }
+        spawnedObjects.Clear();
     }
 
     float GenerateFractalNoise(float x, float z)
@@ -122,20 +236,6 @@ public class TerrainGenerator : MonoBehaviour
         return Mathf.Clamp01(noise);
     }
 
-    int GetBiomeIndex(float temp, float moisture)
-    {
-        for (int i = 0; i < biomes.Count; i++)
-        {
-            var b = biomes[i];
-            if (temp >= b.minTemperature && temp <= b.maxTemperature &&
-                moisture >= b.minMoisture && moisture <= b.maxMoisture)
-            {
-                UnityEngine.Debug.Log($"Biome matched: {b.name} for temp: {temp}, moisture: {moisture}");
-                return i;
-            }
-        }
-        return 0; // default biome
-    }
     float[,] GenerateFalloffMap(int width, int depth)
     {
         float[,] map = new float[width + 1, depth + 1];
@@ -151,6 +251,26 @@ public class TerrainGenerator : MonoBehaviour
         }
         return map;
     }
+
+    float GetRiverOffset(int x, int z)
+    {
+        float totalOffset = 0f;
+
+        for (int i = 0; i < riverCount; i++)
+        {
+            float xOffset = i * 100f;
+            float riverCenter = Mathf.PerlinNoise((z + xOffset) * riverCurveFrequency, i * 10f) * width;
+
+            float distance = Mathf.Abs(x - riverCenter);
+            float t = Mathf.InverseLerp(riverWidth, 0, distance);
+            float depth = Mathf.SmoothStep(0, riverDepth, t);
+
+            totalOffset += depth;
+        }
+
+        return totalOffset;
+    }
+
     (int, float) GetBiomeBlend(float temp, float moisture)
     {
         float closestDistance = float.MaxValue;
@@ -168,22 +288,23 @@ public class TerrainGenerator : MonoBehaviour
             }
         }
 
-        // Convert distance to blend factor: closer = 1, farther = 0
-        float maxDistance = 0.3f; // tweak for softness
+        float maxDistance = 0.3f;
         float weight = Mathf.Clamp01(1f - (closestDistance / maxDistance));
         return (closestBiome, weight);
-
     }
-
 }
 
 [System.Serializable]
 public class Biome
 {
     public string name;
-    [Range(0f, 1f)] public float minTemperature;
-    [Range(0f, 1f)] public float maxTemperature;
-    [Range(0f, 1f)] public float minMoisture;
-    [Range(0f, 1f)] public float maxMoisture;
-    public Texture2D texture; // Just for reference in Inspector
+    [Range(0f, 1f)] public float minTemperature = 0f;
+    [Range(0f, 1f)] public float maxTemperature = 1f;
+    [Range(0f, 1f)] public float minMoisture = 0f;
+    [Range(0f, 1f)] public float maxMoisture = 1f;
+    public Texture2D texture;
+
+    [Header("Spawning")]
+    [Range(0f, 1f)] public float spawnDensity;
+    public List<GameObject> spawnPrefabs;
 }

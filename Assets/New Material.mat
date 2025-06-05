@@ -75,12 +75,20 @@ Material:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
+    - _Texture2DAsset_12dcf03ebb8e41b88e0c788a47968338_Out_0_Texture2D:
+        m_Texture: {fileID: 2800000, guid: 0ee37486d75774b42b92189dcc8f6a64, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     - _Texture2D_Array:
         m_Texture: {fileID: 18700000, guid: 4eda323d3e79f4547af367437cd6f621, type: 2}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _grass:
         m_Texture: {fileID: 2800000, guid: 966b22887514788498836ade66035100, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _river:
+        m_Texture: {fileID: 2800000, guid: 0ee37486d75774b42b92189dcc8f6a64, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _rock:
