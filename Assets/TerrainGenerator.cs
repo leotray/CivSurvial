@@ -19,17 +19,21 @@ public class TerrainGenerator : MonoBehaviour
     [Header("Biome Settings")]
     public List<Biome> biomes;
     public Material terrainMaterial; // Material using a texture array shader
-
+    
     private Mesh mesh;
     private Vector3[] vertices;
     private int[] triangles;
     private Color[] colors;
+    public bool regenerate = false; // Toggle in Inspector during Play Mode
 
     void Update()
     {
-        GenerateTerrain();
+        if (regenerate)
+        {
+            regenerate = false;
+            GenerateTerrain();
+        }
     }
-
     void GenerateTerrain()
     {
         mesh = new Mesh();
@@ -45,27 +49,26 @@ public class TerrainGenerator : MonoBehaviour
         colors = new Color[vertices.Length];
         triangles = new int[width * depth * 6];
 
+        float[,] falloffMap = GenerateFalloffMap(width, depth); // Move outside loop!
+
         for (int z = 0; z <= depth; z++)
         {
             for (int x = 0; x <= width; x++)
             {
-                float height = GenerateFractalNoise(x, z) * heightMultiplier;
                 int index = z * (width + 1) + x;
-                vertices[index] = new Vector3(x, height, z);
 
-                // Generate mock temperature and moisture based on position (you can improve this)
+                float baseHeight = GenerateFractalNoise(x, z);
+                float falloff = falloffMap[x, z];
+                float finalHeight = Mathf.Clamp01(baseHeight - falloff) * heightMultiplier;
+
+                vertices[index] = new Vector3(x, finalHeight, z);
+
                 float temp = Mathf.InverseLerp(0, width, x);
                 float moisture = Mathf.InverseLerp(0, depth, z);
+                
 
-                int biomeIndex = GetBiomeIndex(temp, moisture);
-                colors[index] = new Color((float)biomeIndex / (biomes.Count - 1), 0, 0);
-                UnityEngine.Debug.Log($"BiomeIndex: {biomeIndex}, biomes.Count: {biomes.Count}");
-                UnityEngine.Debug.Log($"x:{x}, z:{z}, temp:{temp}, moisture:{moisture}");
-                for (int i = 0; i < biomes.Count; i++)
-                {
-                    var b = biomes[i];
-                    UnityEngine.Debug.Log($"Biome {i}: temp range [{b.minTemperature}, {b.maxTemperature}], moisture range [{b.minMoisture}, {b.maxMoisture}]");
-                }
+                (int biomeIndex, float blendWeight) = GetBiomeBlend(temp, moisture);
+                colors[index] = new Color(blendWeight, biomeIndex / (float)(biomes.Count - 1), 0);
             }
         }
 
@@ -127,11 +130,51 @@ public class TerrainGenerator : MonoBehaviour
             if (temp >= b.minTemperature && temp <= b.maxTemperature &&
                 moisture >= b.minMoisture && moisture <= b.maxMoisture)
             {
+                UnityEngine.Debug.Log($"Biome matched: {b.name} for temp: {temp}, moisture: {moisture}");
                 return i;
             }
         }
         return 0; // default biome
     }
+    float[,] GenerateFalloffMap(int width, int depth)
+    {
+        float[,] map = new float[width + 1, depth + 1];
+        for (int x = 0; x <= width; x++)
+        {
+            for (int z = 0; z <= depth; z++)
+            {
+                float fx = x / (float)width * 2 - 1;
+                float fz = z / (float)depth * 2 - 1;
+                float value = Mathf.Max(Mathf.Abs(fx), Mathf.Abs(fz));
+                map[x, z] = value * value / (value * value + (1 - value) * (1 - value));
+            }
+        }
+        return map;
+    }
+    (int, float) GetBiomeBlend(float temp, float moisture)
+    {
+        float closestDistance = float.MaxValue;
+        int closestBiome = 0;
+        for (int i = 0; i < biomes.Count; i++)
+        {
+            var b = biomes[i];
+            float midTemp = (b.minTemperature + b.maxTemperature) / 2f;
+            float midMoist = (b.minMoisture + b.maxMoisture) / 2f;
+            float dist = Vector2.Distance(new Vector2(temp, moisture), new Vector2(midTemp, midMoist));
+            if (dist < closestDistance)
+            {
+                closestDistance = dist;
+                closestBiome = i;
+            }
+        }
+
+        // Convert distance to blend factor: closer = 1, farther = 0
+        float maxDistance = 0.3f; // tweak for softness
+        float weight = Mathf.Clamp01(1f - (closestDistance / maxDistance));
+        return (closestBiome, weight);
+
+    }
+
 }
 
 [System.Serializable]
