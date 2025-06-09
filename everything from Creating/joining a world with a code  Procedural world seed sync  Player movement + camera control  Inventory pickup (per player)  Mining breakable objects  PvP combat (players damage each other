@@ -1,0 +1,264 @@
+using System.Collections.Generic;
+using UnityEngine;
+using Mirror;
+
+public class MultiplayerGameManager : NetworkManager
+{
+    // --- World code for joining ---
+    [SyncVar]
+    public string worldCode;
+
+    public override void OnStartServer()
+    {
+        base.OnStartServer();
+        worldCode = GenerateWorldCode();
+        Debug.Log($"World started with code: {worldCode}");
+    }
+
+    string GenerateWorldCode()
+    {
+        const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+        char[] code = new char[6];
+        for (int i = 0; i < code.Length; i++)
+            code[i] = chars[Random.Range(0, chars.Length)];
+        return new string(code);
+    }
+
+    // Placeholder: JoinWorld logic depends on relay/matchmaking (not included)
+
+    // --- World generation seed sync ---
+    [SyncVar(hook = nameof(OnSeedChanged))]
+    public int worldSeed;
+
+    public override void OnServerAddPlayer(NetworkConnection conn)
+    {
+        base.OnServerAddPlayer(conn);
+
+        // If first player, generate seed
+        if (numPlayers == 1)
+        {
+            worldSeed = Random.Range(0, 100000);
+            Debug.Log($"World seed set to {worldSeed}");
+        }
+    }
+
+    void OnSeedChanged(int oldSeed, int newSeed)
+    {
+        Debug.Log($"Seed changed: {newSeed}");
+        GenerateWorld(newSeed);
+    }
+
+    void GenerateWorld(int seed)
+    {
+        // Call your procedural generation code here with the seed
+        Debug.Log($"Generating world with seed {seed} on client");
+    }
+}
+
+// --- Player script with movement, inventory, mining, and combat ---
+
+public class MultiplayerPlayer : NetworkBehaviour
+{
+    // Movement speed
+    public float moveSpeed = 5f;
+
+    // Player health
+    [SyncVar(hook = nameof(OnHealthChanged))]
+    public int health = 100;
+
+    // Inventory (simple list of strings for demo)
+    private List<string> inventory = new List<string>();
+
+    // Mining target (could be assigned by raycast, simplified here)
+    private BreakableObject miningTarget;
+
+    void Update()
+    {
+        if (!isLocalPlayer) return;
+
+        HandleMovement();
+        HandleInput();
+    }
+
+    void HandleMovement()
+    {
+        float h = Input.GetAxis("Horizontal");
+        float v = Input.GetAxis("Vertical");
+
+        Vector3 move = new Vector3(h, 0, v) * moveSpeed * Time.deltaTime;
+        transform.Translate(move, Space.World);
+
+        // Optional: rotate player toward movement direction
+        if (move != Vector3.zero)
+            transform.forward = move;
+    }
+
+    void HandleInput()
+    {
+        if (Input.GetKeyDown(KeyCode.E))
+        {
+            TryPickupItem();
+        }
+
+        if (Input.GetMouseButtonDown(0))
+        {
+            TryMineOrAttack();
+        }
+    }
+
+    void TryPickupItem()
+    {
+        Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+        if (Physics.Raycast(ray, out RaycastHit hit, 3f))
+        {
+            var item = hit.collider.GetComponent<PickupItem>();
+            if (item != null)
+            {
+                CmdPickupItem(item.netIdentity);
+            }
+        }
+    }
+
+    void TryMineOrAttack()
+    {
+        Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+        if (Physics.Raycast(ray, out RaycastHit hit, 3f))
+        {
+            var breakable = hit.collider.GetComponent<BreakableObject>();
+            if (breakable != null)
+            {
+                CmdMineObject(breakable.netIdentity, 25);
+            }
+            else
+            {
+                var player = hit.collider.GetComponent<MultiplayerPlayer>();
+                if (player != null && player != this)
+                {
+                    CmdAttackPlayer(player.netIdentity, 10);
+                }
+            }
+        }
+    }
+
+    // --- Inventory ---
+
+    [Command]
+    void CmdPickupItem(NetworkIdentity itemId)
+    {
+        if (itemId.gameObject.activeSelf)
+        {
+            itemId.gameObject.SetActive(false);
+            inventory.Add(itemId.gameObject.name);
+            TargetUpdateInventory(connectionToClient, inventory.ToArray());
+        }
+    }
+
+    [TargetRpc]
+    void TargetUpdateInventory(NetworkConnection target, string[] items)
+    {
+        inventory = new List<string>(items);
+        Debug.Log("Inventory updated: " + string.Join(", ", inventory));
+        // Update your inventory UI here
+    }
+
+    // --- Mining ---
+
+    [Command]
+    void CmdMineObject(NetworkIdentity breakableId, int damage)
+    {
+        var breakable = breakableId.GetComponent<BreakableObject>();
+        if (breakable != null)
+        {
+            breakable.TakeDamage(damage);
+            RpcPlayMiningAnimation(breakableId.netId);
+        }
+    }
+
+    [ClientRpc]
+    void RpcPlayMiningAnimation(uint breakableId)
+    {
+        var breakable = NetworkIdentity.spawned[breakableId]?.GetComponent<BreakableObject>();
+        if (breakable != null)
+        {
+            // Play mining animation on breakable if needed
+        }
+    }
+
+    // --- Combat ---
+
+    [Command]
+    void CmdAttackPlayer(NetworkIdentity targetId, int damage)
+    {
+        var targetPlayer = targetId.GetComponent<MultiplayerPlayer>();
+        if (targetPlayer != null)
+        {
+            targetPlayer.TakeDamage(damage);
+            RpcPlayHitAnimation(targetId.netId);
+        }
+    }
+
+    [ClientRpc]
+    void RpcPlayHitAnimation(uint targetId)
+    {
+        var target = NetworkIdentity.spawned[targetId]?.GetComponent<MultiplayerPlayer>();
+        if (target != null)
+        {
+            // Play hit animation or effect on target
+        }
+    }
+
+    [Server]
+    public void TakeDamage(int amount)
+    {
+        health -= amount;
+        if (health <= 0)
+        {
+            health = 0;
+            // Handle player death
+            Debug.Log($"{netIdentity.netId} died.");
+        }
+    }
+
+    void OnHealthChanged(int oldHealth, int newHealth)
+    {
+        Debug.Log($"Health changed: {newHealth}");
+        // Update health UI locally
+    }
+}
+
+// --- Breakable Object ---
+
+public class BreakableObject : NetworkBehaviour
+{
+    [SyncVar(hook = nameof(OnHealthChanged))]
+    public int health = 100;
+
+    [Server]
+    public void TakeDamage(int amount)
+    {
+        health -= amount;
+        if (health <= 0)
+        {
+            health = 0;
+            RpcDisableObject();
+        }
+    }
+
+    [ClientRpc]
+    void RpcDisableObject()
+    {
+        gameObject.SetActive(false);
+    }
+
+    void OnHealthChanged(int oldHealth, int newHealth)
+    {
+        // Optional: update visual damage state
+    }
+}
+
+// --- Pickup Item ---
+
+public class PickupItem : NetworkBehaviour
+{
+    // Empty marker class for pickup items
+}
