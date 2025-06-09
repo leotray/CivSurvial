@@ -1,0 +1,29 @@
+using UnityEngine;
+using Unity.Netcode;
+using UnityEngine.SceneManagement;
+
+public class NetworkBootstrap : MonoBehaviour
+{
+    public void StartHost()
+    {
+        NetworkManager.Singleton.StartHost();
+        Debug.Log("Host started");
+    }
+
+    public void StartClient()
+    {
+        NetworkManager.Singleton.StartClient();
+        Debug.Log("Client started");
+    }
+
+    public void StartServerOnly()
+    {
+        NetworkManager.Singleton.StartServer();
+        Debug.Log("Dedicated server started");
+    }
+
+    public void ExitGame()
+    {
+        Application.Quit();
+    }
+}
