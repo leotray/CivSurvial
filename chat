@@ -1,0 +1,180 @@
+// ChatColorManager.cs
+using UnityEngine;
+
+public static class ChatColorManager
+{
+    public static readonly string[] Colors =
+    {
+        "#FF4F4F", // red
+        "#4FFF4F", // green
+        "#4FFFFF", // cyan
+        "#FFD700", // gold
+        "#FF69B4", // pink
+        "#FFA500", // orange
+        "#9B30FF"  // purple
+    };
+}
+
+// PlayerController.cs
+using Unity.Netcode;
+using UnityEngine;
+
+public class PlayerController : NetworkBehaviour
+{
+    public NetworkVariable<FixedString64Bytes> playerName = new NetworkVariable<FixedString64Bytes>();
+    public NetworkVariable<int> playerColorIndex = new NetworkVariable<int>();
+
+    void Start()
+    {
+        if (IsOwner)
+        {
+            string name = PlayerPrefs.GetString("PlayerName", $"Player_{Random.Range(1000, 9999)}");
+            int colorIndex = Random.Range(0, ChatColorManager.Colors.Length);
+
+            SetNameServerRpc(name, colorIndex);
+        }
+    }
+
+    [ServerRpc]
+    void SetNameServerRpc(string name, int colorIndex)
+    {
+        playerName.Value = name;
+        playerColorIndex.Value = colorIndex;
+    }
+}
+
+// PlayerChatBubble.cs
+using UnityEngine;
+using UnityEngine.UI;
+using Unity.Netcode;
+using System.Collections;
+
+public class PlayerChatBubble : NetworkBehaviour
+{
+    public GameObject chatBubbleCanvas;
+    public Text chatBubbleText;
+
+    private Coroutine hideCoroutine;
+
+    public override void OnNetworkSpawn()
+    {
+        base.OnNetworkSpawn();
+        HideBubble();
+    }
+
+    [ClientRpc]
+    public void ShowChatBubbleClientRpc(string message)
+    {
+        chatBubbleText.text = message;
+        chatBubbleCanvas.SetActive(true);
+
+        if (hideCoroutine != null)
+            StopCoroutine(hideCoroutine);
+
+        hideCoroutine = StartCoroutine(HideAfterSeconds(3f));
+    }
+
+    IEnumerator HideAfterSeconds(float seconds)
+    {
+        yield return new WaitForSeconds(seconds);
+        HideBubble();
+    }
+
+    private void HideBubble()
+    {
+        chatBubbleCanvas.SetActive(false);
+    }
+}
+
+// NetworkChat.cs
+using UnityEngine;
+using UnityEngine.UI;
+using Unity.Netcode;
+using System;
+
+public class NetworkChat : NetworkBehaviour
+{
+    public InputField chatInput;
+    public Text chatDisplay;
+    private ScrollRect scrollRect;
+
+    void Start()
+    {
+        scrollRect = chatDisplay.GetComponentInParent<ScrollRect>();
+    }
+
+    void Update()
+    {
+        if (!IsOwner) return;
+
+        if (Input.GetKeyDown(KeyCode.Return))
+        {
+            string message = chatInput.text.Trim();
+            if (!string.IsNullOrWhiteSpace(message))
+            {
+                SendChatServerRpc(NetworkManager.Singleton.LocalClientId, message);
+                chatInput.text = "";
+                chatInput.ActivateInputField();
+            }
+        }
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    void SendChatServerRpc(ulong senderId, string message)
+    {
+        string senderName = $"Player_{senderId}";
+        string color = "#FFFFFF";
+
+        foreach (var client in NetworkManager.Singleton.ConnectedClients)
+        {
+            if (client.Key == senderId)
+            {
+                var playerObj = client.Value.PlayerObject;
+                if (playerObj != null)
+                {
+                    if (playerObj.TryGetComponent(out PlayerController pc))
+                    {
+                        senderName = pc.playerName.Value.ToString();
+                        color = ChatColorManager.Colors[pc.playerColorIndex.Value];
+                    }
+                    if (playerObj.TryGetComponent(out PlayerChatBubble bubble))
+                    {
+                        bubble.ShowChatBubbleClientRpc(message);
+                    }
+                }
+            }
+        }
+
+        if (message.StartsWith("/"))
+        {
+            string response = HandleCommand(senderName, message);
+            if (!string.IsNullOrEmpty(response))
+                BroadcastMessageClientRpc(response);
+            return;
+        }
+
+        string time = DateTime.Now.ToString("HH:mm");
+        string fullMessage = $"<color=grey>[{time}]</color> <b><color={color}>{senderName}</color></b>: {message}";
+        BroadcastMessageClientRpc(fullMessage);
+    }
+
+    [ClientRpc]
+    void BroadcastMessageClientRpc(string message)
+    {
+        chatDisplay.text += message + "\n";
+        Canvas.ForceUpdateCanvases();
+        scrollRect.verticalNormalizedPosition = 0f;
+    }
+
+    string HandleCommand(string senderName, string command)
+    {
+        if (command.Equals("/help", StringComparison.OrdinalIgnoreCase))
+        {
+            return $"<color=yellow><i>{senderName} used /help</i></color>\nCommands:\n/help - Show help\n/whisper NAME MESSAGE - Send private message (not implemented)";
+        }
+        else
+        {
+            return $"<color=red><i>Unknown command: {command}</i></color>";
+        }
+    }
+}
