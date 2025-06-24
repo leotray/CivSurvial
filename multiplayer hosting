@@ -1,17 +1,44 @@
-using UnityEngine;
 using Unity.Netcode;
+using UnityEngine;
 using UnityEngine.UI;
 
-public class MultiplayerLauncher : MonoBehaviour
+public class CustomNetworkManager : MonoBehaviour
 {
     public Button hostButton;
     public Button clientButton;
     public Button serverButton;
+    public InputField ipInput;
 
     void Start()
     {
-        hostButton.onClick.AddListener(() => NetworkManager.Singleton.StartHost());
-        clientButton.onClick.AddListener(() => NetworkManager.Singleton.StartClient());
-        serverButton.onClick.AddListener(() => NetworkManager.Singleton.StartServer());
+        hostButton.onClick.AddListener(StartHost);
+        clientButton.onClick.AddListener(StartClient);
+        serverButton.onClick.AddListener(StartServer);
+    }
+
+    void StartHost()
+    {
+        NetworkManager.Singleton.StartHost();
+        Debug.Log("Hosting...");
+    }
+
+    void StartClient()
+    {
+        string ip = ipInput.text.Trim();
+        if (!string.IsNullOrEmpty(ip))
+        {
+            Unity.Netcode.Transports.UTP.UnityTransport transport =
+                NetworkManager.Singleton.GetComponent<Unity.Netcode.Transports.UTP.UnityTransport>();
+            transport.ConnectionData.Address = ip;
+        }
+
+        NetworkManager.Singleton.StartClient();
+        Debug.Log("Connecting as client...");
+    }
+
+    void StartServer()
+    {
+        NetworkManager.Singleton.StartServer();
+        Debug.Log("Server started...");
     }
 }
