@@ -17,6 +17,8 @@ public class InventoryManager : MonoBehaviour
     public GameObject currentLeftHeldItem;  // Left-hand (shield) item
     public int selectedSlot = -1;
 
+    public PlayerStats playerStats;         // Assign this in Inspector
+
     private void Start()
     {
         ChangeSelectedSlot(0);
@@ -32,6 +34,44 @@ public class InventoryManager : MonoBehaviour
                 ChangeSelectedSlot(Number - 1);
             }
         }
+        // Right-click to eat food if in selected slot
+        // Right-click to eat food if in selected slot
+        if (Input.GetMouseButtonDown(1))
+        {
+            inventoryItem selectedItem = selectedSlot >= 0 ? inventorySlots[selectedSlot].GetComponentInChildren<inventoryItem>() : null;
+
+            if (selectedItem == null || selectedItem.item == null)
+            {
+                Debug.LogWarning("No item in selected slot.");
+                return;
+            }
+
+            if (selectedItem.item.itemCategory != Item.ItemCategory.Food)
+            {
+                Debug.Log($"Item '{selectedItem.item.itemName}' is not food.");
+                return;
+            }
+
+            if (playerStats.currentHunger >= playerStats.maxHunger)
+            {
+                Debug.Log("Hunger already full. Cannot eat.");
+                return;
+            }
+
+            Debug.Log($"Consuming food: {selectedItem.item.itemName}");
+
+            playerStats.ModifyHunger(selectedItem.item.hungerRestore);
+            playerStats.TryHealFromFood(selectedItem.item.hungerRestore); // heal only if hunger is high
+            RemoveItem(selectedItem.item, 1);
+        }
+
+
+
+        // Block with right-click
+        if (Input.GetMouseButtonDown(1))
+            SetShieldBlockingPose(true);
+        if (Input.GetMouseButtonUp(1))
+            SetShieldBlockingPose(false);
     }
 
     void ChangeSelectedSlot(int newValue)
@@ -127,7 +167,6 @@ public class InventoryManager : MonoBehaviour
 
     public void UpdateHeldItem()
     {
-        // Destroy previous held items
         if (currentHeldItem != null)
         {
             Destroy(currentHeldItem);
@@ -161,7 +200,7 @@ public class InventoryManager : MonoBehaviour
             }
         }
 
-        // Left-hand (shield slot)
+        // Left-hand (shield)
         inventoryItem shieldItem = shieldSlot.GetComponentInChildren<inventoryItem>();
         if (shieldItem != null && shieldItem.item != null && shieldItem.item.isShield && shieldItem.item.itemPrefab != null)
         {
@@ -192,6 +231,12 @@ public class InventoryManager : MonoBehaviour
 
             leftHandTransform.localPosition = target.localPosition;
             leftHandTransform.localRotation = target.localRotation;
+        }
+
+        // Tell PlayerStats to update block state
+        if (playerStats != null)
+        {
+            playerStats.isBlocking = isBlocking;
         }
     }
 }

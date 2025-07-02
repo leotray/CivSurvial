@@ -9,6 +9,7 @@ public class TimeManager : MonoBehaviour
     [SerializeField] private Texture2D skyboxSunrise;
     [SerializeField] private Texture2D skyboxDay;
     [SerializeField] private Texture2D skyboxSunset;
+    public float speed;
 
     [SerializeField] private Gradient graddientNightToSunrise;
     [SerializeField] private Gradient graddientSunriseToDay;
@@ -36,7 +37,7 @@ public class TimeManager : MonoBehaviour
 
     public void Update()
     {
-        tempSecond += Time.deltaTime;
+        tempSecond += Time.deltaTime* speed;
 
         if (tempSecond >= 1)
         {
