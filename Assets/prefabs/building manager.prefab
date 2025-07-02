@@ -1,0 +1,57 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &6233322153594095432
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 4249092624022685701}
+  - component: {fileID: 6459181261180460816}
+  m_Layer: 0
+  m_Name: building manager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &4249092624022685701
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6233322153594095432}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 69.90606, y: 1.6581876, z: 455.5986}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_RootOrder: 3
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &6459181261180460816
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6233322153594095432}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d99dbed694080f044a74fc49567c8e67, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  buildingPrefabs:
+  - {fileID: 284112975020268999, guid: e41e9181d22c5ae44b6ce1c818ca66e1, type: 3}
+  - {fileID: 6786860967312668548, guid: f650c3bb89fc3194c97997be1c428994, type: 3}
+  - {fileID: 4792632098798203386, guid: 3812b9f044108054eaf112182b7485ea, type: 3}
+  - {fileID: 2819970835854521736, guid: 0c3d7e7e2a0231f47890fc999c6a89c0, type: 3}
+  groundLayer:
+    serializedVersion: 2
+    m_Bits: 128
+  gridSize: 1
+  maxBuildDistance: 5
+  playerCamera: {fileID: 0}

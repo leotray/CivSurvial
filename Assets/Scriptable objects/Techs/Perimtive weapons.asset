@@ -1,0 +1,22 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f374da0f861cc1f4ba0f4fa4d1b4d403, type: 3}
+  m_Name: Perimtive weapons
+  m_EditorClassIdentifier: 
+  techName: perimitive Weapons
+  cost: 1
+  description: 
+  unlocksAfterPurchase:
+  - {fileID: 11400000, guid: 7c36d960a42e22e438d3c40c32e40b72, type: 2}
+  unlockedRecipes:
+  - {fileID: 11400000, guid: ef7150e1c70e8a14d91eaa28b47d704c, type: 2}
+  - {fileID: 11400000, guid: 44fa66a86607b9746be2241da32bab70, type: 2}
