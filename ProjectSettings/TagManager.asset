@@ -8,6 +8,7 @@ TagManager:
   - snapable
   - SnapPoint
   - CraftingTableUI
+  - Horse
   layers:
   - Default
   - TransparentFX

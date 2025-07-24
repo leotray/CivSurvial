@@ -12,6 +12,8 @@ public class Item : ScriptableObject
     public bool stackable = true;
     public Vector3Int range = new Vector3Int(5, 4, 5);
     public bool isShield; // 👈 Add this to the Item ScriptableObject
+    [Header("Taming")]
+    public bool tamesHorses;
 
 
     [Header("Type")]

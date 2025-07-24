@@ -8,20 +8,23 @@ public class InventoryManager : MonoBehaviour
 
     public Transform handTransform;
     public Transform leftHandTransform;
-    public Transform normalLeftHandPosition;    // Assign in Inspector
-    public Transform blockingLeftHandPosition;  // Assign in Inspector
+    public Transform normalLeftHandPosition;
+    public Transform blockingLeftHandPosition;
 
     public inventorySlot shieldSlot;
 
-    public GameObject currentHeldItem;      // Right-hand item
-    public GameObject currentLeftHeldItem;  // Left-hand (shield) item
+    public GameObject currentHeldItem;
+    public GameObject currentLeftHeldItem;
     public int selectedSlot = -1;
 
-    public PlayerStats playerStats;         // Assign this in Inspector
+    public PlayerStats playerStats;
+
+    private HorseMounting horseMounting;
 
     private void Start()
     {
         ChangeSelectedSlot(0);
+        horseMounting = GetComponent<HorseMounting>();
     }
 
     private void Update()
@@ -34,44 +37,66 @@ public class InventoryManager : MonoBehaviour
                 ChangeSelectedSlot(Number - 1);
             }
         }
-        // Right-click to eat food if in selected slot
-        // Right-click to eat food if in selected slot
+
         if (Input.GetMouseButtonDown(1))
         {
             inventoryItem selectedItem = selectedSlot >= 0 ? inventorySlots[selectedSlot].GetComponentInChildren<inventoryItem>() : null;
 
             if (selectedItem == null || selectedItem.item == null)
             {
-                Debug.LogWarning("No item in selected slot.");
+                Debug.Log("🔍 No item selected to use.");
                 return;
             }
 
-            if (selectedItem.item.itemCategory != Item.ItemCategory.Food)
+            if (selectedItem.item.itemCategory == Item.ItemCategory.Food)
             {
-                Debug.Log($"Item '{selectedItem.item.itemName}' is not food.");
-                return;
+                Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+                if (Physics.Raycast(ray, out RaycastHit hit, 5f))
+                {
+                    MountableHorse horse = hit.collider.GetComponentInParent<MountableHorse>();
+                    if (horse != null)
+                    {
+                        Debug.Log("🎯 Looking at a horse. Trying to tame...");
+                        if (selectedItem.item.tamesHorses)
+                        {
+                            Debug.Log("✅ This food CAN tame horses.");
+                            if (!horse.isTamed)
+                            {
+                                Debug.Log("🐴 Horse is NOT tamed. Taming now...");
+                                horse.isTamed = true;
+                                RemoveItem(selectedItem.item, 1);
+                                Debug.Log("🎉 Horse has been tamed!");
+                                return;
+                            }
+                            else
+                            {
+                                Debug.Log("ℹ️ Horse is already tamed.");
+                                return;
+                            }
+                        }
+                        else
+                        {
+                            Debug.Log("❌ This food cannot tame horses.");
+                        }
+                    }
+                }
+
+                // Regular eating (only if not taming a horse)
+                if (playerStats.currentHunger >= playerStats.maxHunger)
+                {
+                    Debug.Log("⚠️ Hunger is already full.");
+                    return;
+                }
+
+                Debug.Log("🍖 Eating food...");
+                playerStats.ModifyHunger(selectedItem.item.hungerRestore);
+                playerStats.TryHealFromFood(selectedItem.item.hungerRestore);
+                RemoveItem(selectedItem.item, 1);
             }
-
-            if (playerStats.currentHunger >= playerStats.maxHunger)
-            {
-                Debug.Log("Hunger already full. Cannot eat.");
-                return;
-            }
-
-            Debug.Log($"Consuming food: {selectedItem.item.itemName}");
-
-            playerStats.ModifyHunger(selectedItem.item.hungerRestore);
-            playerStats.TryHealFromFood(selectedItem.item.hungerRestore); // heal only if hunger is high
-            RemoveItem(selectedItem.item, 1);
         }
 
-
-
-        // Block with right-click
-        if (Input.GetMouseButtonDown(1))
-            SetShieldBlockingPose(true);
-        if (Input.GetMouseButtonUp(1))
-            SetShieldBlockingPose(false);
+        if (Input.GetMouseButtonDown(1)) SetShieldBlockingPose(true);
+        if (Input.GetMouseButtonUp(1)) SetShieldBlockingPose(false);
     }
 
     void ChangeSelectedSlot(int newValue)
@@ -155,6 +180,7 @@ public class InventoryManager : MonoBehaviour
                 return true;
             }
         }
+
         return false;
     }
 
@@ -172,13 +198,13 @@ public class InventoryManager : MonoBehaviour
             Destroy(currentHeldItem);
             currentHeldItem = null;
         }
+
         if (currentLeftHeldItem != null)
         {
             Destroy(currentLeftHeldItem);
             currentLeftHeldItem = null;
         }
 
-        // Right-hand (hotbar)
         if (selectedSlot >= 0)
         {
             inventoryItem selectedItem = inventorySlots[selectedSlot].GetComponentInChildren<inventoryItem>();
@@ -200,7 +226,6 @@ public class InventoryManager : MonoBehaviour
             }
         }
 
-        // Left-hand (shield)
         inventoryItem shieldItem = shieldSlot.GetComponentInChildren<inventoryItem>();
         if (shieldItem != null && shieldItem.item != null && shieldItem.item.isShield && shieldItem.item.itemPrefab != null)
         {
@@ -228,12 +253,10 @@ public class InventoryManager : MonoBehaviour
         if (leftHandTransform != null && normalLeftHandPosition != null && blockingLeftHandPosition != null)
         {
             Transform target = isBlocking ? blockingLeftHandPosition : normalLeftHandPosition;
-
             leftHandTransform.localPosition = target.localPosition;
             leftHandTransform.localRotation = target.localRotation;
         }
 
-        // Tell PlayerStats to update block state
         if (playerStats != null)
         {
             playerStats.isBlocking = isBlocking;

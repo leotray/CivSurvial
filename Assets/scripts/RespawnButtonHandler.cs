@@ -23,9 +23,10 @@ public class RespawnButtonHandler : MonoBehaviour
         playerStats.healthBar.SetHealth(playerStats.maxHealth);
         playerStats.hungerBar.SetHealth(playerStats.maxHunger);
 
-        // Move player to spawn point
-        playerStats.transform.position = spawnPoint.position;
-        playerStats.transform.rotation = spawnPoint.rotation;
+        // Move the **entire player GameObject**
+        GameObject playerObject = playerStats.gameObject; // or .transform.root.gameObject if needed
+        playerObject.transform.position = spawnPoint.position;
+        playerObject.transform.rotation = spawnPoint.rotation;
 
         Debug.Log("Spawned at position of spawn point: " + spawnPoint.position);
 
@@ -38,6 +39,7 @@ public class RespawnButtonHandler : MonoBehaviour
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
     }
+
     private IEnumerator ReenableMovement(PlayerMovement movement)
     {
         yield return null; // Wait 1 frame

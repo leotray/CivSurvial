@@ -1,48 +1,66 @@
-using System;
 using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
 public class TimeManager : MonoBehaviour
 {
+    [Header("Skybox Textures")]
     [SerializeField] private Texture2D skyboxNight;
     [SerializeField] private Texture2D skyboxSunrise;
     [SerializeField] private Texture2D skyboxDay;
     [SerializeField] private Texture2D skyboxSunset;
-    public float speed;
 
+    [Header("Time Settings")]
+    public float speed = 1f;
+
+    [Header("Lighting")]
     [SerializeField] private Gradient graddientNightToSunrise;
     [SerializeField] private Gradient graddientSunriseToDay;
     [SerializeField] private Gradient graddientDayToSunset;
     [SerializeField] private Gradient graddientSunsetToNight;
-
     [SerializeField] private Light globalLight;
 
     private int minutes;
-
     public int Minutes
-    { get { return minutes; } set { minutes = value; OnMinutesChange(value); } }
+    {
+        get => minutes;
+        set
+        {
+            minutes = value;
+            OnMinutesChange(value);
+        }
+    }
 
     private int hours = 5;
-
     public int Hours
-    { get { return hours; } set { hours = value; OnHoursChange(value); } }
+    {
+        get => hours;
+        set
+        {
+            hours = value;
+            OnHoursChange(value);
+        }
+    }
 
     private int days;
-
     public int Days
-    { get { return days; } set { days = value; } }
+    {
+        get => days;
+        set => days = value;
+    }
 
     private float tempSecond;
+    private int lastTransitionHour = -1;
+    private Coroutine skyboxCoroutine;
+    private Coroutine lightCoroutine;
 
-    public void Update()
+    private void Update()
     {
-        tempSecond += Time.deltaTime* speed;
+        tempSecond += Time.deltaTime * speed;
 
-        if (tempSecond >= 1)
+        if (tempSecond >= 1f)
         {
             Minutes += 1;
-            tempSecond = 0;
+            tempSecond = 0f;
         }
     }
 
@@ -63,47 +81,61 @@ public class TimeManager : MonoBehaviour
 
     private void OnHoursChange(int value)
     {
+        if (value == lastTransitionHour) return;
+        lastTransitionHour = value;
+
         if (value == 6)
         {
-            StartCoroutine(LerpSkybox(skyboxNight, skyboxSunrise, 10f));
-            StartCoroutine(LerpLight(graddientNightToSunrise, 10f));
+            StartSkyboxTransition(skyboxNight, skyboxSunrise, graddientNightToSunrise);
         }
         else if (value == 8)
         {
-            StartCoroutine(LerpSkybox(skyboxSunrise, skyboxDay, 10f));
-            StartCoroutine(LerpLight(graddientSunriseToDay, 10f));
+            StartSkyboxTransition(skyboxSunrise, skyboxDay, graddientSunriseToDay);
         }
         else if (value == 18)
         {
-            StartCoroutine(LerpSkybox(skyboxDay, skyboxSunset, 10f));
-            StartCoroutine(LerpLight(graddientDayToSunset, 10f));
+            StartSkyboxTransition(skyboxDay, skyboxSunset, graddientDayToSunset);
         }
         else if (value == 22)
         {
-            StartCoroutine(LerpSkybox(skyboxSunset, skyboxNight, 10f));
-            StartCoroutine(LerpLight(graddientSunsetToNight, 10f));
+            StartSkyboxTransition(skyboxSunset, skyboxNight, graddientSunsetToNight);
         }
+    }
+
+    private void StartSkyboxTransition(Texture2D from, Texture2D to, Gradient lightGradient)
+    {
+        if (skyboxCoroutine != null)
+            StopCoroutine(skyboxCoroutine);
+        if (lightCoroutine != null)
+            StopCoroutine(lightCoroutine);
+
+        skyboxCoroutine = StartCoroutine(LerpSkybox(from, to, 10f));
+        lightCoroutine = StartCoroutine(LerpLight(lightGradient, 10f));
     }
 
     private IEnumerator LerpSkybox(Texture2D a, Texture2D b, float time)
     {
         RenderSettings.skybox.SetTexture("_Texture1", a);
         RenderSettings.skybox.SetTexture("_Texture2", b);
-        RenderSettings.skybox.SetFloat("_Blend", 0);
-        for (float i = 0; i < time; i += Time.deltaTime)
+        RenderSettings.skybox.SetFloat("_Blend", 0f);
+
+        for (float t = 0f; t < time; t += Time.deltaTime)
         {
-            RenderSettings.skybox.SetFloat("_Blend", i / time);
+            RenderSettings.skybox.SetFloat("_Blend", t / time);
             yield return null;
         }
+
         RenderSettings.skybox.SetTexture("_Texture1", b);
+        RenderSettings.skybox.SetFloat("_Blend", 0f);
     }
 
     private IEnumerator LerpLight(Gradient lightGradient, float time)
     {
-        for (float i = 0; i < time; i += Time.deltaTime)
+        for (float t = 0f; t < time; t += Time.deltaTime)
         {
-            globalLight.color = lightGradient.Evaluate(i / time);
-            RenderSettings.fogColor = globalLight.color;
+            Color color = lightGradient.Evaluate(t / time);
+            globalLight.color = color;
+            RenderSettings.fogColor = color;
             yield return null;
         }
     }

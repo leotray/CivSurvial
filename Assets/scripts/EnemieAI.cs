@@ -10,6 +10,8 @@ public class EnemieAI : MonoBehaviour
     public LayerMask whatIsGround;
     public LayerMask whatIsPlayer;
     public bool isAgressive;
+    public bool isRideable;
+
     public Vector3 walkPoint;
     bool walkPointSet;
 
@@ -30,26 +32,35 @@ public class EnemieAI : MonoBehaviour
 
     private Animator animator;
     private bool hasDealtDamage;
+    private bool isJumping = false;
 
-    // For Jump Physics
     private Transform jumpPhysics;
     private Rigidbody jumpRb;
 
-    private void Awake()
+    void Awake()
     {
         agent = GetComponent<NavMeshAgent>();
-        animator = GetComponent<Animator>();
+        animator = GetComponentInChildren<Animator>(); // Animator might be on a child like "Horse/HorseBody"
         player = FindObjectOfType<PlayerMovement>()?.transform;
 
-        // Find the JumpPhysics child
         jumpPhysics = transform.Find("Wolf/Wolf/JumpPhysics");
         if (jumpPhysics != null)
             jumpRb = jumpPhysics.GetComponent<Rigidbody>();
     }
 
-    private void Update()
+    void Update()
     {
-        if (player == null || isJumping) return;
+        if (!agent.enabled || isJumping) return;
+
+        // 🐎 If this is a rideable animal not being ridden, it patrols.
+        if (isRideable)
+        {
+            Patroling();
+            UpdateAnimations();
+            return;
+        }
+
+        if (player == null) return;
 
         playerInSightRange = Physics.CheckSphere(transform.position, sightRange, whatIsPlayer);
         playerInAttackRange = Physics.CheckSphere(transform.position, attackRange, whatIsPlayer);
@@ -58,13 +69,13 @@ public class EnemieAI : MonoBehaviour
             Patroling();
         else if (playerInSightRange && !playerInAttackRange && isAgressive)
             ChasePlayer();
-        else if (playerInAttackRange &  isAgressive)
+        else if (playerInAttackRange && isAgressive)
             Attack();
 
         UpdateAnimations();
     }
 
-    private void Patroling()
+    void Patroling()
     {
         if (!walkPointSet)
             SearchWalkPoint();
@@ -81,7 +92,7 @@ public class EnemieAI : MonoBehaviour
             walkPointSet = false;
     }
 
-    private void SearchWalkPoint()
+    void SearchWalkPoint()
     {
         for (int i = 0; i < 10; i++)
         {
@@ -103,33 +114,32 @@ public class EnemieAI : MonoBehaviour
         }
     }
 
-    private void ChasePlayer()
+    void ChasePlayer()
     {
         if (player != null)
             agent.SetDestination(player.position);
     }
 
-    private void Attack()
+    void Attack()
     {
         if (!alreadyAttacked && player != null)
         {
             alreadyAttacked = true;
             hasDealtDamage = false;
 
-            animator.SetTrigger("Jump");
+            animator?.SetTrigger("Jump");
             StartCoroutine(JumpSequence());
 
             Invoke(nameof(ResetAttack), timeBetweenAttacks + 1f);
         }
     }
 
-    bool isJumping = false;
-
     IEnumerator JumpSequence()
     {
         isJumping = true;
 
         agent.enabled = false;
+
         if (jumpRb != null)
         {
             jumpRb.isKinematic = false;
@@ -150,7 +160,6 @@ public class EnemieAI : MonoBehaviour
             jumpRb.isKinematic = true;
         }
 
-        // Sync this GameObject's position with JumpPhysics's position
         if (jumpPhysics != null)
             transform.position = jumpPhysics.position;
 
@@ -160,7 +169,7 @@ public class EnemieAI : MonoBehaviour
         isJumping = false;
     }
 
-    private void TryDamagePlayer()
+    void TryDamagePlayer()
     {
         if (hasDealtDamage || player == null) return;
 
@@ -176,22 +185,25 @@ public class EnemieAI : MonoBehaviour
         }
     }
 
-    private void ResetAttack()
+    void ResetAttack()
     {
         alreadyAttacked = false;
     }
 
-    private void UpdateAnimations()
+    void UpdateAnimations()
     {
         if (animator == null || agent == null) return;
 
         bool isMoving = agent.velocity.magnitude > 0.1f && agent.remainingDistance > agent.stoppingDistance;
-        animator.SetBool("IsWalking", isMoving);
+
+        animator.SetBool("IsMoving", isMoving);
+        animator.SetBool("IsGalloping", false); // Only true in HorseController.cs
     }
 
-    private void LateUpdate()
+    void LateUpdate()
     {
-        if (!agent.enabled || player == null || isJumping) return;
+        if (!agent.enabled || isJumping || isRideable) return;
+        if (player == null) return;
 
         Vector3 dir;
 
@@ -211,7 +223,7 @@ public class EnemieAI : MonoBehaviour
         }
     }
 
-    private void OnDrawGizmosSelected()
+    void OnDrawGizmosSelected()
     {
         Gizmos.color = Color.yellow;
         Gizmos.DrawWireSphere(transform.position, sightRange);

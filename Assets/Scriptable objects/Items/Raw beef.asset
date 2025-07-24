@@ -20,6 +20,7 @@ MonoBehaviour:
   stackable: 1
   range: {x: 5, y: 4, z: 5}
   isShield: 0
+  tamesHorses: 1
   itemCategory: 1
   toolType: 0
   toolTier: 0

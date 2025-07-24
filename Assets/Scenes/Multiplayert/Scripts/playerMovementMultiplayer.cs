@@ -1,7 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using FishNet.Connection;
 using FishNet.Object;
 
 [RequireComponent(typeof(Rigidbody))]
@@ -12,43 +11,77 @@ public class PlayerMovementMultiplayer : NetworkBehaviour
     public float normalSpeed = 5f;
     private float currentSpeed;
     public float cameraYOffset;
+    public Transform glasses;
 
-    public Transform cameraTransform; // Assign in Inspector
+
+    public Transform cameraTransform; // Set at runtime
 
     private Rigidbody rb;
     private Vector3 moveDirection;
 
-    public void OnStartClient()
+    public override void OnStartClient()
     {
         base.OnStartClient();
-        if (base.IsOwner)
+
+        if (IsOwner)
         {
-            cameraTransform = Camera.main.transform;
-            cameraTransform.position = new Vector3(transform.position.x, transform.position.y + cameraYOffset, transform.position.z);
+            // Assign the camera transform
+            Camera cam = GetComponentInChildren<Camera>(true);
+            if (cam != null)
+            {
+                cam.gameObject.SetActive(true);
+                cameraTransform = cam.transform;
+            }
+
+            // Enable movement script
+            movement moveScript = GetComponentInChildren<movement>(true);
+            if (moveScript != null)
+            {
+                moveScript.enabled = true;
+            }
+        }
+        else
+        {
+            // Disable camera for non-owners
+            Camera cam = GetComponentInChildren<Camera>(true);
+            if (cam != null)
+            {
+                cam.gameObject.SetActive(false);
+            }
+
+            // Disable movement script for non-owners
+            movement moveScript = GetComponentInChildren<movement>(true);
+            if (moveScript != null)
+            {
+                moveScript.enabled = false;
+            }
         }
     }
 
     void Start()
     {
         rb = GetComponent<Rigidbody>();
-        rb.freezeRotation = true; // Prevent unwanted rotation from physics
-        rb.interpolation = RigidbodyInterpolation.Interpolate; // ADD THIS
-
+        rb.freezeRotation = true;
+        rb.interpolation = RigidbodyInterpolation.Interpolate;
     }
 
     void Update()
     {
+        if (!IsOwner) return;
         HandleInput();
+        // Set position to match player every frame
+        glasses.position = transform.position + new Vector3(0, 1.7f, 0); // Adjust Y to match head height
+        glasses.rotation = Camera.main.transform.rotation; // Or however you're rotating it
     }
 
     void FixedUpdate()
     {
+        if (!IsOwner) return;
         MovePlayer();
     }
 
     void HandleInput()
     {
-        // Camera-relative input
         Vector3 input = new Vector3(Input.GetAxis("Horizontal"), 0f, Input.GetAxis("Vertical"));
 
         Vector3 camForward = cameraTransform.forward;
@@ -60,7 +93,6 @@ public class PlayerMovementMultiplayer : NetworkBehaviour
 
         moveDirection = (camForward * input.z + camRight * input.x).normalized;
 
-        // Speed selection
         if (Input.GetKey(KeyCode.LeftShift))
             currentSpeed = sprintSpeed;
         else if (Input.GetKey(KeyCode.LeftAlt))
