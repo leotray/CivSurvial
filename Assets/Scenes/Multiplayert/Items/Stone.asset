@@ -1,0 +1,42 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f8b0b6956748b4748984b0018a1413fb, type: 3}
+  m_Name: Stone
+  m_EditorClassIdentifier: 
+  attackRate: 4
+  guid: 1
+  itemName: Stone
+  icon: {fileID: 21300000, guid: 7423dfdc466439c4e9171b2666b982e9, type: 3}
+  itemPrefab: {fileID: 4099196189679263115, guid: 6bf086d42c5c5d645b5ba0ea1df7f189, type: 3}
+  buildPrefab: {fileID: 4462983797652850894, guid: 6747cbbd2faa7624f9d6ae005561fada, type: 3}
+  itemMaxCount: 5
+  stackable: 1
+  range: {x: 5, y: 4, z: 5}
+  itemCategory: 2
+  buildType: 2
+  toolType: 0
+  toolTier: 0
+  baseDamage: 10
+  effectiveAgainst: 4
+  effectivenessMultiplier: 2
+  damage: 0
+  hungerRestore: 0
+  isShield: 0
+  tamesHorses: 0
+  isFuel: 0
+  isThrowable: 1
+  throwablePrefab: {fileID: 4099196189679263115, guid: a588429f5da85ca4086234b618e64d3a, type: 3}
+  throwForce: 15
+  throwCooldown: 0.5
+  throwDamage: 10
+  throwLifetime: 5
+  throwStaminaCost: 15

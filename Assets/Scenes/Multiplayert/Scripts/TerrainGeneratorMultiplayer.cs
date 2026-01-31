@@ -22,9 +22,16 @@ public class TerrainGeneratorMultiplayer : NetworkBehaviour
     public float heightExponent = 2f;
 
     [Header("Biome Settings")]
-
     public List<Biome> biomes;
     public Material terrainMaterial;
+
+    [Header("Biome Generation (Fixed)")]
+    public float biomeScale = 0.03f; // Much smaller for larger biomes
+    [Range(1, 3)] public int biomeOctaves = 2; // Fewer octaves for smoother regions
+    [Range(0.3f, 0.8f)] public float biomePersistence = 0.6f;
+    [Range(1.5f, 2.5f)] public float biomeLacunarity = 2f;
+    [Range(0.1f, 0.5f)] public float domainWarpStrength = 0.2f; // Reduced warping
+    [Range(0.2f, 0.8f)] public float biomeBlendSmoothness = 0.4f;
 
     [Header("River Settings")]
     public int riverCount = 2;
@@ -43,6 +50,8 @@ public class TerrainGeneratorMultiplayer : NetworkBehaviour
     private System.Random prng;
     private float noiseOffsetX;
     private float noiseOffsetY;
+    private float biomeOffsetX;
+    private float biomeOffsetY;
 
     private Mesh mesh;
     private Vector3[] vertices;
@@ -58,6 +67,13 @@ public class TerrainGeneratorMultiplayer : NetworkBehaviour
         InitializeSeed();
         GenerateTerrain();
         SpawnBiomeObjects();
+
+        // Tell the chunk manager how big the terrain is
+        if (LandChunkManager.Instance != null)
+        {
+            LandChunkManager.Instance.InitializeChunks(width, depth);
+        }
+
     }
 
     public override void OnStartClient()
@@ -89,6 +105,8 @@ public class TerrainGeneratorMultiplayer : NetworkBehaviour
         prng = new System.Random(seed);
         noiseOffsetX = (float)(prng.NextDouble() * 10000);
         noiseOffsetY = (float)(prng.NextDouble() * 10000);
+        biomeOffsetX = (float)(prng.NextDouble() * 10000);
+        biomeOffsetY = (float)(prng.NextDouble() * 10000);
     }
 
     void GenerateTerrain()
@@ -135,14 +153,13 @@ public class TerrainGeneratorMultiplayer : NetworkBehaviour
                 float finalHeight = shapedHeight * heightMultiplier;
                 vertices[index] = new Vector3(x, finalHeight, z);
 
-                float temp = Mathf.InverseLerp(0, width, x);
-                float moisture = Mathf.InverseLerp(0, depth, z);
-
-                (int biomeIndex, float blendWeight) = GetBiomeBlend(temp, moisture);
+                // FIXED: Generate large irregular biome regions
+                (int biomeIndex, float blendWeight) = GetLargeBiomeRegions(x, z);
                 bool isRiver = riverCarve > 0.01f;
 
+                // Maintain the same color encoding for shader compatibility
                 colors[index] = isRiver
-                    ? new Color(0, 0, 1)
+                    ? new Color(0, 0, 1) // Rivers remain blue in blue channel
                     : new Color(blendWeight, biomeIndex / (float)(biomes.Count - 1), 0);
             }
         }
@@ -165,6 +182,120 @@ public class TerrainGeneratorMultiplayer : NetworkBehaviour
                 tris += 6;
             }
         }
+    }
+
+    // FIXED: Create large biome regions instead of noisy pixels
+    (int, float) GetLargeBiomeRegions(int x, int z)
+    {
+        if (biomes == null || biomes.Count == 0)
+            return (0, 1f);
+
+        // FIXED: Use much lower frequency noise for large regions
+        float tempScale = biomeScale * 0.5f; // Even larger scale for temperature
+        float moistScale = biomeScale * 0.7f; // Slightly smaller scale for moisture variation
+
+        // Generate broad temperature and moisture maps
+        float temperature = GenerateTemperatureRegions(x, z, tempScale);
+        float moisture = GenerateMoistureRegions(x, z, moistScale);
+
+        // Find closest biome based on temperature/moisture
+        float closestDistance = float.MaxValue;
+        int closestBiome = 0;
+
+        for (int i = 0; i < biomes.Count; i++)
+        {
+            var biome = biomes[i];
+            float midTemp = (biome.minTemperature + biome.maxTemperature) / 2f;
+            float midMoist = (biome.minMoisture + biome.maxMoisture) / 2f;
+
+            float dist = Vector2.Distance(new Vector2(temperature, moisture), new Vector2(midTemp, midMoist));
+
+            if (dist < closestDistance)
+            {
+                closestDistance = dist;
+                closestBiome = i;
+            }
+        }
+
+        // FIXED: Smoother blend calculation for biome edges
+        float maxDistance = biomeBlendSmoothness;
+        float weight = Mathf.Clamp01(1f - (closestDistance / maxDistance));
+
+        // Add subtle edge noise for natural transitions (much less than before)
+        float edgeNoise = SimplexNoise(x * biomeScale * 2f, z * biomeScale * 2f, biomeOffsetX) * 0.1f;
+        weight = Mathf.Clamp01(weight + edgeNoise);
+
+        return (closestBiome, weight);
+    }
+
+    // FIXED: Generate broad temperature regions
+    float GenerateTemperatureRegions(float x, float z, float scale)
+    {
+        // Base temperature gradient (island effect - cooler towards edges)
+        float centerX = width * 0.5f;
+        float centerZ = depth * 0.5f;
+        float distanceFromCenter = Vector2.Distance(new Vector2(x, z), new Vector2(centerX, centerZ));
+        float maxDistance = Mathf.Sqrt(centerX * centerX + centerZ * centerZ);
+        float baseTemp = 1f - (distanceFromCenter / maxDistance) * 0.6f; // Cooler towards edges
+
+        // FIXED: Use very low frequency noise for large temperature regions
+        float tempNoise = SimplexNoise(x * scale, z * scale, biomeOffsetX) * 0.4f;
+
+        // Add slight variation with even lower frequency
+        float tempVariation = SimplexNoise(x * scale * 0.3f, z * scale * 0.3f, biomeOffsetX + 1000f) * 0.2f;
+
+        float finalTemp = baseTemp + tempNoise + tempVariation;
+        return Mathf.Clamp01(finalTemp);
+    }
+
+    // FIXED: Generate broad moisture regions
+    float GenerateMoistureRegions(float x, float z, float scale)
+    {
+        // Base moisture influenced by rivers
+        float riverInfluence = 0f;
+        for (int i = 0; i < riverCount; i++)
+        {
+            float xOffset = i * 10000f + seed * 5000f;
+            float riverCenter = Mathf.PerlinNoise((z + xOffset) * riverCurveFrequency, i * 10f) * width;
+            float distanceToRiver = Mathf.Abs(x - riverCenter);
+            float riverMoisture = Mathf.InverseLerp(riverWidth * 4f, 0f, distanceToRiver) * 0.5f;
+            riverInfluence = Mathf.Max(riverInfluence, riverMoisture);
+        }
+
+        // FIXED: Very broad moisture patterns
+        float moistNoise = SimplexNoise(x * scale, z * scale, biomeOffsetY + 2000f) * 0.5f;
+
+        // Add secondary moisture variation with lower frequency
+        float moistVariation = SimplexNoise(x * scale * 0.4f, z * scale * 0.4f, biomeOffsetY + 5000f) * 0.3f;
+
+        float baseMoisture = 0.3f + riverInfluence;
+        float finalMoisture = baseMoisture + moistNoise + moistVariation;
+        return Mathf.Clamp01(finalMoisture);
+    }
+
+    // FIXED: Use Simplex-like noise for smoother, larger regions
+    float SimplexNoise(float x, float z, float offset)
+    {
+        // Simplified Perlin noise with multiple octaves for smoother large-scale patterns
+        float noise = 0f;
+        float amplitude = 1f;
+        float frequency = 1f;
+        float maxValue = 0f;
+
+        for (int i = 0; i < biomeOctaves; i++)
+        {
+            float sampleX = (x + offset) * frequency;
+            float sampleZ = (z + offset) * frequency;
+
+            float perlin = Mathf.PerlinNoise(sampleX, sampleZ) * 2f - 1f; // Range -1 to 1
+            noise += perlin * amplitude;
+            maxValue += amplitude;
+
+            amplitude *= biomePersistence;
+            frequency *= biomeLacunarity;
+        }
+
+        return noise / maxValue;
     }
 
     void UpdateMesh()
@@ -239,7 +370,16 @@ public class TerrainGeneratorMultiplayer : NetworkBehaviour
                     Quaternion rotation = Quaternion.FromToRotation(Vector3.up, normal) *
                                           Quaternion.Euler(0, prng.Next(0, 360), 0);
 
-                    GameObject spawned = Instantiate(entry.prefab, position, rotation, transform);
+                    GameObject spawned = Instantiate(entry.prefab, position, rotation);
+                    var no = spawned.GetComponent<NetworkObject>();
+                    if (no != null && IsServer)
+                    {
+                        base.Spawn(no); // this will register it with FishNet
+                    }
+                    else
+                    {
+                        Debug.LogWarning($"[SpawnBiomeObjects] Prefab missing NetworkObject or not running on server: {entry.prefab.name}");
+                    }
                     spawnedObjects.Add(spawned);
                 }
             }
@@ -320,28 +460,6 @@ public class TerrainGeneratorMultiplayer : NetworkBehaviour
         return totalOffset;
     }
 
-    (int, float) GetBiomeBlend(float temp, float moisture)
-    {
-        float closestDistance = float.MaxValue;
-        int closestBiome = 0;
-        for (int i = 0; i < biomes.Count; i++)
-        {
-            var b = biomes[i];
-            float midTemp = (b.minTemperature + b.maxTemperature) / 2f;
-            float midMoist = (b.minMoisture + b.maxMoisture) / 2f;
-            float dist = Vector2.Distance(new Vector2(temp, moisture), new Vector2(midTemp, midMoist));
-            if (dist < closestDistance)
-            {
-                closestDistance = dist;
-                closestBiome = i;
-            }
-        }
-
-        float maxDistance = 0.3f;
-        float weight = Mathf.Clamp01(1f - (closestDistance / maxDistance));
-        return (closestBiome, weight);
-    }
-
     [System.Serializable]
     public class Biome
     {
@@ -363,3 +481,4 @@ public class TerrainGeneratorMultiplayer : NetworkBehaviour
         [Range(0f, 1f)] public float spawnDensity = 0.5f;
     }
 }
+

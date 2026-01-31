@@ -15,7 +15,7 @@ public class MineableObject : MonoBehaviour
     public GameObject dropPrefab; // 👈 Assign in Inspector
     public int dropAmount = 1;    // Optional: How many items to drop
 
-    int health;
+    public int health;
 
     void Start()
     {

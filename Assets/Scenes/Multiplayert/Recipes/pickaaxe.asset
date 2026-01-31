@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a4dc4ecf624b4dc46b108e024f0f2742, type: 3}
+  m_Name: pickaaxe
+  m_EditorClassIdentifier: 
+  recipeName: pickaxes
+  ingredients:
+  - itemGuid: 1
+    amount: 2
+  outputItem: {fileID: 11400000, guid: 07a8f5957fb3b954b91b3feecfdacbbc, type: 2}
+  outputAmount: 1

@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6b1ff9063f00d6a46bab28654ff76913, type: 3}
+  m_Name: PickTech
+  m_EditorClassIdentifier: 
+  techId: 0
+  techName: PickTech
+  cost: 1
+  unlockedRecipeNames:
+  - pickaxes
+  unlocksAfterPurchase:
+  - {fileID: 11400000, guid: 347c613bdb0d415479dd2803796ce4b8, type: 2}
+  description: 'unlocks pickaxe crafting recipe
+
+'
+  icon: {fileID: 0}
+  prerequisites: []

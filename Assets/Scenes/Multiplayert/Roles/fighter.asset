@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 58c328ca92cc35e42af31d8785a718b4, type: 3}
+  m_Name: fighter
+  m_EditorClassIdentifier: 
+  roleName: Fighter
+  icon: {fileID: 21300000, guid: ce127a7b65ecb6c46aa603ba55c67c8c, type: 3}
+  description: become a fighter and defeat your enemies, 2x attack speed, 2x combat
+    damage
+  miningSpeedMultiplier: 1
+  miningDamageMultiplier: 1
+  combatAttackSpeedMultiplier: 5
+  combatDamageMultiplier: 5
+  maxHealthBonus: 0
+  staminaRegenBonus: 0
+  buildingCostMultiplier: 2
+  skillTreePanelPrefab: {fileID: 151297152403640940, guid: 75c9c77ba4c08924b9004d5d2da6d378, type: 3}

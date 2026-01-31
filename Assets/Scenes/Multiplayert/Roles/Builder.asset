@@ -1,0 +1,25 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 58c328ca92cc35e42af31d8785a718b4, type: 3}
+  m_Name: Builder
+  m_EditorClassIdentifier: 
+  roleName: builder
+  icon: {fileID: 0}
+  description: you can build unique buildings with lower costs than others
+  miningSpeedMultiplier: 1
+  miningDamageMultiplier: 1
+  combatAttackSpeedMultiplier: 1
+  combatDamageMultiplier: 1
+  maxHealthBonus: 0
+  staminaRegenBonus: 0
+  buildingCostMultiplier: 1
+  skillTreePanelPrefab: {fileID: 6229989467879636384, guid: 50f2b58efb222aa47b070bb0a8f846d3, type: 3}

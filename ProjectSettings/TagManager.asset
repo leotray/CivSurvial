@@ -9,6 +9,7 @@ TagManager:
   - SnapPoint
   - CraftingTableUI
   - Horse
+  - Mineable-Damageable
   layers:
   - Default
   - TransparentFX
@@ -19,9 +20,9 @@ TagManager:
   - Mineable-damageable
   - ground
   - player
-  - 
-  - 
-  - 
+  - Buildable
+  - MinimapTerrain
+  - Banner
   - 
   - 
   - 
